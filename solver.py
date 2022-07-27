@@ -179,6 +179,11 @@ def generic_search(cost_function, start_state, search_type):
     return path, path_cost, frontier_count, expanded_count
 
 
+def ucost(start_state):
+    # Uniform cost search
+    return generic_search(addCost, start_state, 'ucost')
+
+
 def greedyh1(start_state):
     # Greedy search that counts number of misplaced tiles
     return generic_search(addCost, start_state, 'greedy')
