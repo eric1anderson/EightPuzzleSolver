@@ -9,8 +9,11 @@ Where:
   'Search algorithm' is one of ucost, astarh1, astarh2, astarh3, greedyh1, greedyh2, greedyh3
   
 example starting board representation:
+
 [8] [0] [2]
+
 [3] [5] [6]
+
 [1] [7] [4]  
 example command: python solver.py 802356174 astar-h2 
 
