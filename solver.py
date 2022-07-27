@@ -6,127 +6,74 @@ import pdqpq
 MAX_SEARCH_ITERS = 100000
 GOAL_STATE = puzz.EightPuzzleBoard("012345678")
 
-def is_goal(n):
-    """
 
-    Args:
-        'n' - a state
-
-    Returns:
-        boolean checking if this state is the goal state
-
-    """
-    return n == GOAL_STATE
-
-def addCost(state):
-    """
-    Counts the number of misplaced tiles from the current state to the goal state
-
-    Args:
-        'state' - current state
-
-    Returns:
-        number of misplaced tiles
-
-
-    """
-    total = 0
-    for i in range(len(str(state))):
-
-        if str(state)[i] != str(GOAL_STATE)[i] and str(state)[i] != '0':
-            total += 1
-    return total
-
-def manhattanCost(state):
-    """
-    Distance to goal state by making up, down, left, right moves regardless of other tiles on board
-
-    Args:
-        'state' - current state
-
-    Returns:
-        Manhattan distance from current state to goal state
-
-    """
-    manCost = 0
-    if state == GOAL_STATE:
-        manCost = 1
-    else:
-        for i in range(len(str(state))):
-
-            correctTile = GOAL_STATE.find(str(GOAL_STATE)[i])
-
-            if str(str(GOAL_STATE)[i]) != "0":
-                tile = state.find(str(GOAL_STATE)[i])
-                manCost += abs(tile[0] - correctTile[0]) + abs(tile[1] - correctTile[1])
-    return manCost
-
-def weightedAddCost(state):
-    """
-    Weighted manhattan cost. Weight is equal to squared value of tile times Manhattan distance from goal state
-    Args:
-        'state' - current state
-
-    Returns:
-        weighted distance to goal state
-
-    """
-    manCost = 0
-    total = 0
-    if state == GOAL_STATE:
-        total = 1
-    else:
-        for i in range(len(str(state))):
-
-            correctTile = GOAL_STATE.find(str(GOAL_STATE)[i])
-
-            if str(str(GOAL_STATE)[i]) != "0":
-                tile = state.find(str(GOAL_STATE)[i])
-
-                manCost = abs(tile[0] - correctTile[0]) + abs(tile[1] - correctTile[1])
-
-            total += int(str(GOAL_STATE)[i])**2 * manCost
-    return total
-
-
-def generic_search(cost_function, start_state, search_type):
-    """
-        Generic search structure used as a skeleton for uniform cost, greedy, and A* search variants
-
-        Args:
-            'cost_function' - cost function to be used in search algorithm - one of: misplaced tile count heuristic,
-                              Manhattan distance heuristic, weighted Manhattan distance heuristic
-            'start_state' - initial position of tiles
-            'search_type' - search algorithm type
-
-        Returns:
-            'path' -  a list of 2-tuples representing the path from the start state to the goal state
-                (both should be included), with each entry being a (str, EightPuzzleBoard) pair
-                indicating the move and resulting state for each action.  Omitted if the search
-                fails.
-            'path_cost' - the total cost of the path, taking into account the costs associated
-                with each state transition.  Omitted if the search fails.
-            'frontier_count' - the number of unique states added to the search frontier at any
-                point during the search.
-            'expanded_count' - the number of unique states removed from the frontier and expanded
-                (successors generated).
-
-
-    """
+def bfs(start_state):
     explored = pdqpq.PriorityQueue()
     frontier = pdqpq.PriorityQueue()
-    if search_type == "astar" or search_type == "ucost":
-        frontier.add(start_state, 0)
-    else:
-        frontier.add(start_state, cost_function(start_state))
+    frontier.add(start_state)
     parents = {}
     moves = {}
     path = []
     path_cost = 0
     frontier_count = 1
     expanded_count = 0
-    costs = {start_state: cost_function(start_state)}
-    trueCosts = {start_state: 0}
+    if start_state == GOAL_STATE:
+        frontier_count = 0
+        expanded_count = 0
+        path = [("start", start_state)]
+    else:
+        while not frontier.empty():
+            node = frontier.pop()
+            expanded_count += 1
+
+            current = node
+            explored.add(node)
+            tempCurr = current
+            trueCostValue = 0
+            for k, n in node.successors().items():
+                move = k
+                if (n not in frontier) and (n not in explored):
+
+                    if is_goal(n):
+                        path = [(k, n)] + path
+                        prev = n
+                        while parents.get(current):
+
+                            path_cost += int(str(prev)[int(str(current).index("0"))]) ** 2
+                            move = moves[current]
+                            path = [(move, current)] + path # move is key of value current
+                            prev = current
+                            current = parents[current]
+
+                        path_cost += int(str(prev)[int(str(current).index("0"))]) ** 2
+                        path = [('start', start_state)] + path
+
+                        return path, path_cost, frontier_count, expanded_count
+                    else:
+
+                        frontier.add(n)
+                        frontier_count += 1
+                        parents[n] = node
+                        moves[n] = k
+
+    return path, path_cost, frontier_count, expanded_count
+
+
+def is_goal(n):
+    return n == GOAL_STATE
+
+
+def ucost(start_state):
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, 0)
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: 0}
 
     while not frontier.empty():
         node = frontier.pop()
@@ -135,13 +82,64 @@ def generic_search(cost_function, start_state, search_type):
         if is_goal(node):
 
             while parents.get(current):
+
+                move = moves[current]
+                path = [(move, current)] + path  # move is key of value current
+
+                current = parents[current]
+            path_cost = costs[node]
+
+            path = [('start', start_state)] + path
+            return path, path_cost, frontier_count, expanded_count
+        else:
+            expanded_count += 1
+            explored.add(node)
+
+            for k, n in node.successors().items():
+
+                cost = int(str(node)[int(str(n).index("0"))]) ** 2 + costs[node]
+
+                if (n not in frontier) and (n not in explored):
+
+                    frontier.add(n, cost)
+                    frontier_count += 1
+                    parents[n] = node
+                    moves[n] = k
+                    costs[n] = cost
+
+                elif (n in frontier) and (frontier.get(n) > cost):
+                    frontier.add(n, cost)
+                    moves[n] = k
+                    costs[n] = cost
+                    parents[n] = node
+
+    return path, path_cost, frontier_count, expanded_count
+
+
+def greedyh1(start_state):
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, addCost(start_state, GOAL_STATE))
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: addCost(start_state, GOAL_STATE)}
+    trueCosts = {start_state: 0}
+
+    while not frontier.empty():
+        node = frontier.pop()
+
+        current = node
+        if is_goal(node):
+           # print(costs)
+            while parents.get(current):
                 move = moves[current]
                 path = [(move, current)] + path  # move is key of value current
                 current = parents[current]
-            if search_type == 'ucost':
-                path_cost = costs[node]
-            else:
-                path_cost = trueCosts[node]
+            path_cost = trueCosts[node]
             path = [('start', start_state)] + path
             return path, path_cost, frontier_count, expanded_count
 
@@ -150,15 +148,235 @@ def generic_search(cost_function, start_state, search_type):
             explored.add(node)
 
             for k, n in node.successors().items():
-                if search_type == 'ucost':
-                    cost = int(str(node)[int(str(n).index("0"))]) ** 2 + costs[node]
-                else:
-                    trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
-                    if search_type == 'astar':
-                        cost = cost_function(n) + trueCostValue
-                    if search_type =='greedy':
-                        cost = cost_function(n)
 
+                cost = addCost(n, GOAL_STATE)
+                trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
+
+                if (n not in frontier) and (n not in explored):
+
+                    frontier.add(n, cost)
+                    frontier_count += 1
+                    parents[n] = node
+                    moves[n] = k
+                    costs[n] = cost
+                    trueCosts[n] = trueCostValue
+
+                elif (n in frontier) and (frontier.get(n) > cost):
+                    frontier.add(n, cost)
+                    moves[n] = k
+                    costs[n] = cost
+                    parents[n] = node
+                    trueCosts[n] = trueCostValue
+
+    return path, path_cost, frontier_count, expanded_count
+
+
+def addCost(state, end):
+
+    total = 0
+    for i in range(len(str(state))):
+
+        if str(state)[i] != str(end)[i] and str(state)[i] != '0':
+            total += 1
+    return total
+
+
+def greedyh2(start_state): # Number of misplaced tiles
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, manhattanCost(start_state, GOAL_STATE))
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: manhattanCost(start_state, GOAL_STATE)}
+    trueCosts = {start_state: 0}
+
+    while not frontier.empty():
+        node = frontier.pop()
+
+        current = node
+        if is_goal(node):
+            # print(costs)
+            while parents.get(current):
+                move = moves[current]
+                path = [(move, current)] + path  # move is key of value current
+                current = parents[current]
+            path_cost = trueCosts[node]
+            path = [('start', start_state)] + path
+            return path, path_cost, frontier_count, expanded_count
+
+        else:
+            expanded_count += 1
+            explored.add(node)
+
+            for k, n in node.successors().items():
+
+                cost = manhattanCost(n, GOAL_STATE)
+                trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
+
+                if (n not in frontier) and (n not in explored):
+
+                    frontier.add(n, cost)
+                    frontier_count += 1
+                    parents[n] = node
+                    moves[n] = k
+                    costs[n] = cost
+                    trueCosts[n] = trueCostValue
+
+                elif (n in frontier) and (frontier.get(n) > cost):
+                    frontier.add(n, cost)
+                    moves[n] = k
+                    costs[n] = cost
+                    parents[n] = node
+                    trueCosts[n] = trueCostValue
+
+    return path, path_cost, frontier_count, expanded_count
+
+
+def manhattanCost(state, end):
+    manCost = 0
+    if state == end:
+        manCost = 1
+    else:
+      #  print(state.pretty())
+        for i in range(len(str(state))):
+
+            correctTile = end.find(str(end)[i])
+
+            if str(str(end)[i]) != "0":
+
+                tile = state.find(str(end)[i])
+              #  print("Tile 0: ", tile[0], correctTile[0])
+
+                manCost += abs(tile[0] - correctTile[0]) + abs(tile[1] - correctTile[1])
+
+        #print("Cost: ", manCost)
+
+    return manCost
+
+
+def greedyh3(start_state):
+
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, weightedAddCost(start_state, GOAL_STATE))
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: weightedAddCost(start_state, GOAL_STATE)}
+    trueCosts = {start_state: 0}
+
+    while not frontier.empty():
+        node = frontier.pop()
+
+        current = node
+        if is_goal(node):
+            # print(costs)
+            while parents.get(current):
+                move = moves[current]
+                path = [(move, current)] + path  # move is key of value current
+                current = parents[current]
+            path_cost = trueCosts[node]
+            path = [('start', start_state)] + path
+            return path, path_cost, frontier_count, expanded_count
+
+        else:
+            expanded_count += 1
+            explored.add(node)
+
+            for k, n in node.successors().items():
+
+                cost = weightedAddCost(n, GOAL_STATE)
+                trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
+
+                if (n not in frontier) and (n not in explored):
+
+                    frontier.add(n, cost)
+                    frontier_count += 1
+                    parents[n] = node
+                    moves[n] = k
+                    costs[n] = cost
+                    trueCosts[n] = trueCostValue
+
+                elif (n in frontier) and (frontier.get(n) > cost):
+                    frontier.add(n, cost)
+                    moves[n] = k
+                    costs[n] = cost
+                    parents[n] = node
+                    trueCosts[n] = trueCostValue
+
+    return path, path_cost, frontier_count, expanded_count
+
+
+def weightedAddCost(state, end):
+ # print(state.pretty())
+    manCost = 0
+    costAdd = 0
+    total = 0
+    if state == end:
+        manCost = 1
+        costAdd = 1
+        total = 1
+    else:
+        #  print(state.pretty())
+      #  print("-------------------")
+        for i in range(len(str(state))):
+
+            correctTile = end.find(str(end)[i])
+           # print("Tile: ", str(end)[i])
+            if str(state)[i] != str(end)[i]:
+                costAdd = 1
+
+            if str(str(end)[i]) != "0":
+                tile = state.find(str(end)[i])
+
+                manCost = abs(tile[0] - correctTile[0]) + abs(tile[1] - correctTile[1])
+
+            total += int(str(end)[i])**2 * manCost
+    return total
+
+
+def astarh1(start_state):
+
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, 0)
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: addCost(start_state, GOAL_STATE)}
+    trueCosts = {start_state: 0}
+
+    while not frontier.empty():
+        node = frontier.pop()
+
+        current = node
+        if is_goal(node):
+            # print(costs)
+            while parents.get(current):
+                move = moves[current]
+                path = [(move, current)] + path  # move is key of value current
+                current = parents[current]
+            path_cost = trueCosts[node]
+            path = [('start', start_state)] + path
+            return path, path_cost, frontier_count, expanded_count
+
+        else:
+            expanded_count += 1
+            explored.add(node)
+
+            for k, n in node.successors().items():
+                trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
+                cost = addCost(n, GOAL_STATE) + trueCostValue
 
                 if (n not in frontier) and (n not in explored):
                     frontier.add(n, cost)
@@ -166,47 +384,124 @@ def generic_search(cost_function, start_state, search_type):
                     parents[n] = node
                     moves[n] = k
                     costs[n] = cost
-                    if search_type != 'ucost':
-                        trueCosts[n] = trueCostValue
+                    trueCosts[n] = trueCostValue
 
                 elif (n in frontier) and (frontier.get(n) > cost):
                     frontier.add(n, cost)
                     moves[n] = k
                     costs[n] = cost
                     parents[n] = node
-                    if search_type != 'ucost':
-                        trueCosts[n] = trueCostValue
+                    trueCosts[n] = trueCostValue
 
     return path, path_cost, frontier_count, expanded_count
 
 
-def greedyh1(start_state):
-    # Greedy search that counts number of misplaced tiles
-    return generic_search(addCost, start_state, 'greedy')
-
-
-def greedyh2(start_state):
-    # Greedy Manhattan cost search
-    return generic_search(manhattanCost, start_state, 'greedy')
-
-def greedyh3(start_state):
-    # Greedy weighted Manhattan cost search
-    return generic_search(weightedAddCost, start_state, 'greedy')
-
-def astarh1(start_state):
-    # A* search that counts number of misplaced tiles
-    return generic_search(addCost, start_state, 'astar')
-
-
 def astarh2(start_state):
-    # A* Manhattan cost search
-    return generic_search(manhattanCost, start_state, 'astar')
+
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, 0)
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: manhattanCost(start_state, GOAL_STATE)}
+    trueCosts = {start_state: 0}
+
+    while not frontier.empty():
+        node = frontier.pop()
+
+        current = node
+        if is_goal(node):
+            # print(costs)
+            while parents.get(current):
+                move = moves[current]
+                path = [(move, current)] + path  # move is key of value current
+                current = parents[current]
+            path_cost = trueCosts[node]
+            path = [('start', start_state)] + path
+            return path, path_cost, frontier_count, expanded_count
+
+        else:
+            expanded_count += 1
+            explored.add(node)
+
+            for k, n in node.successors().items():
+                trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
+                cost = manhattanCost(n, GOAL_STATE) + trueCostValue
+
+                if (n not in frontier) and (n not in explored):
+                    frontier.add(n, cost)
+                    frontier_count += 1
+                    parents[n] = node
+                    moves[n] = k
+                    costs[n] = cost
+                    trueCosts[n] = trueCostValue
+
+                elif (n in frontier) and (frontier.get(n) > cost):
+                    frontier.add(n, cost)
+                    moves[n] = k
+                    costs[n] = cost
+                    parents[n] = node
+                    trueCosts[n] = trueCostValue
+
+    return path, path_cost, frontier_count, expanded_count
 
 
 def astarh3(start_state):
-    # A* weighted Manhattan cost search
-    return generic_search(weightedAddCost, start_state, 'astar')
 
+    explored = pdqpq.PriorityQueue()
+    frontier = pdqpq.PriorityQueue()
+    frontier.add(start_state, 0)
+    parents = {}
+    moves = {}
+    path = []
+    path_cost = 0
+    frontier_count = 1
+    expanded_count = 0
+    costs = {start_state: weightedAddCost(start_state, GOAL_STATE)}
+    trueCosts = {start_state: 0}
+
+    while not frontier.empty():
+        node = frontier.pop()
+
+        current = node
+        if is_goal(node):
+            # print(costs)
+            while parents.get(current):
+                move = moves[current]
+                path = [(move, current)] + path  # move is key of value current
+                current = parents[current]
+            path_cost = trueCosts[node]
+            path = [('start', start_state)] + path
+            return path, path_cost, frontier_count, expanded_count
+
+        else:
+            expanded_count += 1
+            explored.add(node)
+
+            for k, n in node.successors().items():
+                trueCostValue = int(str(node)[int(str(n).index("0"))]) ** 2 + trueCosts[node]
+                cost = weightedAddCost(n, GOAL_STATE) + trueCostValue
+
+                if (n not in frontier) and (n not in explored):
+                    frontier.add(n, cost)
+                    frontier_count += 1
+                    parents[n] = node
+                    moves[n] = k
+                    costs[n] = cost
+                    trueCosts[n] = trueCostValue
+
+                elif (n in frontier) and (frontier.get(n) > cost):
+                    frontier.add(n, cost)
+                    moves[n] = k
+                    costs[n] = cost
+                    parents[n] = node
+                    trueCosts[n] = trueCostValue
+
+    return path, path_cost, frontier_count, expanded_count
 
 
 def solve_puzzle(start_state, strategy):
@@ -215,6 +510,7 @@ def solve_puzzle(start_state, strategy):
     Args:
         start_state: an EightPuzzleBoard object indicating the start state for the search
         flavor: a string indicating which type of search to run.  Can be one of the following:
+            'bfs' - breadth-first search
             'ucost' - uniform-cost search
             'greedy-h1' - Greedy best-first search using a misplaced tile count heuristic - Number of misplaced tiles
             'greedy-h2' - Greedy best-first search using a Manhattan distance heuristic
@@ -242,8 +538,28 @@ def solve_puzzle(start_state, strategy):
         'frontier_count': 0,
         'expanded_count': 0,
     }
+    if strategy == "bfs":
+        returned = bfs(start_state)
+    elif strategy == "ucost":
+        returned = ucost(start_state)
 
-    returned = eval(strategy)(start_state)
+    elif strategy == "greedy-h1":
+        returned = greedyh1(start_state)
+
+    elif strategy == "greedy-h2":
+        returned = greedyh2(start_state)
+
+    elif strategy == "greedy-h3":
+        returned = greedyh3(start_state)
+
+    elif strategy == "astar-h1":
+        returned = astarh1(start_state)
+
+    elif strategy == "astar-h2":
+        returned = astarh2(start_state)
+
+    elif strategy == "astar-h3":
+        returned = astarh3(start_state)
 
     results['path'] = returned[0]
     results['path_cost'] = returned[1]
